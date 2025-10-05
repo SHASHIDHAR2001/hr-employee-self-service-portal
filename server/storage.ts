@@ -93,11 +93,7 @@ export class DatabaseStorage implements IStorage {
   async createLeave(leave: InsertLeave): Promise<Leave> {
     const [newLeave] = await db
       .insert(leaves)
-      .values({
-        ...leave,
-        fromDate: new Date(leave.fromDate),
-        toDate: new Date(leave.toDate),
-      })
+      .values(leave)
       .returning();
     return newLeave;
   }
@@ -143,10 +139,7 @@ export class DatabaseStorage implements IStorage {
   async createAttendanceRecord(record: InsertAttendanceRecord): Promise<AttendanceRecord> {
     const [newRecord] = await db
       .insert(attendanceRecords)
-      .values({
-        ...record,
-        date: new Date(record.date),
-      })
+      .values(record)
       .returning();
     return newRecord;
   }

@@ -204,9 +204,10 @@ export const aiConversationsRelations = relations(aiConversations, ({ one }) => 
 
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({
-  id: true,
   createdAt: true,
   updatedAt: true,
+}).extend({
+  id: z.string().optional(),
 });
 
 export const insertLeaveSchema = createInsertSchema(leaves).omit({

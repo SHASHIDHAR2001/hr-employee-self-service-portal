@@ -41,8 +41,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         storage.getAttendanceRecords(userId, currentMonth, currentYear)
       ]);
 
-      const totalLeavesUsed = leaveBalances.reduce((sum, balance) => sum + balance.usedDays, 0);
-      const totalLeavesRemaining = leaveBalances.reduce((sum, balance) => sum + (balance.totalDays - balance.usedDays), 0);
+      const totalLeavesUsed = leaveBalances.reduce((sum, balance) => sum + (balance.usedDays ?? 0), 0);
+      const totalLeavesRemaining = leaveBalances.reduce((sum, balance) => sum + (balance.totalDays - (balance.usedDays ?? 0)), 0);
       
       const presentDays = attendanceRecords.filter(record => record.status === 'present' || record.status === 'wfh').length;
       const totalWorkingDays = attendanceRecords.length;
@@ -57,9 +57,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         pendingRequests: pendingLeaves,
         leaveBalances: leaveBalances.map(balance => ({
           type: balance.leaveTypeId,
-          used: balance.usedDays,
+          used: balance.usedDays ?? 0,
           total: balance.totalDays,
-          remaining: balance.totalDays - balance.usedDays
+          remaining: balance.totalDays - (balance.usedDays ?? 0)
         }))
       });
     } catch (error) {
