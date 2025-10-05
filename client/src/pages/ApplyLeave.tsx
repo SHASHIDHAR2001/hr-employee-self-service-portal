@@ -71,7 +71,8 @@ export default function ApplyLeave() {
   });
 
   const onSubmit = (data: ApplyLeaveForm) => {
-    applyLeaveMutation.mutate(data);
+    const { isHalfDay, ...leaveData } = data;
+    applyLeaveMutation.mutate(leaveData);
   };
 
   const calculateDays = () => {

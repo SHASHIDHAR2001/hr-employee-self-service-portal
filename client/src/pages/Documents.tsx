@@ -14,7 +14,6 @@ import {
   TableRow 
 } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ObjectUploader } from "@/components/ObjectUploader";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { apiRequest } from "@/lib/queryClient";
@@ -127,59 +126,58 @@ export default function Documents() {
     },
   });
 
-  const handleGetUploadParameters = async () => {
-    // Return dummy parameters - we'll handle upload in handleUploadComplete
-    return {
-      method: 'PUT' as const,
-      url: '#',
-    };
-  };
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
 
-  const handleUploadComplete = async (result: any) => {
-    if (result.successful && result.successful.length > 0) {
-      for (const uploadedFile of result.successful) {
-        const fileId = uploadedFile.name;
-        setUploadProgress(prev => ({ ...prev, [fileId]: 0 }));
-        
-        try {
-          // Show progress
-          const progressInterval = setInterval(() => {
-            setUploadProgress(prev => {
-              const currentProgress = prev[fileId] || 0;
-              if (currentProgress >= 90) {
-                clearInterval(progressInterval);
-                return prev;
-              }
-              return { ...prev, [fileId]: Math.min(currentProgress + 10, 90) };
-            });
-          }, 200);
-
-          // Upload to backend - use the original File object from Uppy
-          await uploadDocumentMutation.mutateAsync({
-            file: uploadedFile.file as File,
-            category: 'policy',
+    for (const file of Array.from(files)) {
+      const fileId = file.name;
+      setUploadProgress(prev => ({ ...prev, [fileId]: 0 }));
+      
+      let progressInterval: NodeJS.Timeout | null = null;
+      
+      try {
+        // Show progress
+        progressInterval = setInterval(() => {
+          setUploadProgress(prev => {
+            const currentProgress = prev[fileId] || 0;
+            if (currentProgress >= 90) {
+              if (progressInterval) clearInterval(progressInterval);
+              return prev;
+            }
+            return { ...prev, [fileId]: Math.min(currentProgress + 10, 90) };
           });
+        }, 200);
 
-          clearInterval(progressInterval);
-          setUploadProgress(prev => ({ ...prev, [fileId]: 100 }));
-          
-          // Clear progress after 2 seconds
-          setTimeout(() => {
-            setUploadProgress(prev => {
-              const newProgress = { ...prev };
-              delete newProgress[fileId];
-              return newProgress;
-            });
-          }, 2000);
-        } catch (error) {
+        // Upload to backend
+        await uploadDocumentMutation.mutateAsync({
+          file,
+          category: 'policy',
+        });
+
+        if (progressInterval) clearInterval(progressInterval);
+        setUploadProgress(prev => ({ ...prev, [fileId]: 100 }));
+        
+        // Clear progress after 2 seconds
+        setTimeout(() => {
           setUploadProgress(prev => {
             const newProgress = { ...prev };
             delete newProgress[fileId];
             return newProgress;
           });
-        }
+        }, 2000);
+      } catch (error) {
+        if (progressInterval) clearInterval(progressInterval);
+        setUploadProgress(prev => {
+          const newProgress = { ...prev };
+          delete newProgress[fileId];
+          return newProgress;
+        });
       }
     }
+    
+    // Reset the input
+    event.target.value = '';
   };
 
   const filteredDocuments = documents.filter((doc) => {
@@ -243,18 +241,25 @@ export default function Documents() {
               <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-primary/10 flex items-center justify-center">
                 <CloudUpload className="w-10 h-10 text-primary" />
               </div>
-              <h4 className="text-lg font-semibold text-foreground mb-2">Drag and drop files here</h4>
-              <p className="text-sm text-muted-foreground mb-4">or click to browse from your computer</p>
-              <ObjectUploader
-                maxNumberOfFiles={5}
-                maxFileSize={52428800} // 50MB
-                onGetUploadParameters={handleGetUploadParameters}
-                onComplete={handleUploadComplete}
-                buttonClassName="px-6 py-3 mb-4"
+              <h4 className="text-lg font-semibold text-foreground mb-2">Upload HR Documents</h4>
+              <p className="text-sm text-muted-foreground mb-4">Select files to upload to the knowledge base</p>
+              <input
+                type="file"
+                multiple
+                accept=".pdf,.docx,.txt"
+                onChange={handleFileChange}
+                className="hidden"
+                id="file-upload"
+                data-testid="input-file-upload"
+              />
+              <Button
+                onClick={() => document.getElementById('file-upload')?.click()}
+                className="px-6 py-3 mb-4"
+                data-testid="button-choose-files"
               >
                 <Folder className="w-4 h-4 mr-2" />
                 Choose Files
-              </ObjectUploader>
+              </Button>
               <p className="text-xs text-muted-foreground">
                 Supported formats: PDF, DOCX, TXT • Max file size: 50MB
               </p>
