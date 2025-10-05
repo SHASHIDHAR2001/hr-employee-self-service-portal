@@ -40,11 +40,11 @@ export default function ApplyLeave() {
     },
   });
 
-  const { data: leaveTypes } = useQuery({
+  const { data: leaveTypes = [] } = useQuery<any[]>({
     queryKey: ['/api/leave-types'],
   });
 
-  const { data: leaveBalances } = useQuery({
+  const { data: leaveBalances = [] } = useQuery<any[]>({
     queryKey: ['/api/leave-balances'],
   });
 
@@ -164,7 +164,8 @@ export default function ApplyLeave() {
                 <Checkbox 
                   id="half-day" 
                   checked={isHalfDay}
-                  onCheckedChange={setIsHalfDay}
+                  onCheckedChange={(checked) => setIsHalfDay(checked === true)}
+                  data-testid="checkbox-half-day"
                 />
                 <Label htmlFor="half-day" className="text-sm cursor-pointer">
                   This is a half-day leave
@@ -234,6 +235,7 @@ export default function ApplyLeave() {
                   type="submit" 
                   disabled={applyLeaveMutation.isPending}
                   className="px-6"
+                  data-testid="button-submit-leave"
                 >
                   <Send className="w-4 h-4 mr-2" />
                   {applyLeaveMutation.isPending ? "Submitting..." : "Submit Leave Request"}
