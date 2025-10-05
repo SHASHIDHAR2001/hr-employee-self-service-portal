@@ -43,7 +43,20 @@ export default function Documents() {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [uploadProgress, setUploadProgress] = useState<{ [key: string]: number }>({});
 
-  const { data: documents, isLoading } = useQuery({
+  interface HRDocument {
+    id: string;
+    name: string;
+    category: string;
+    filePath: string;
+    fileSize: number;
+    mimeType: string;
+    uploadedBy: string;
+    isActive: boolean;
+    vectorCount: number;
+    createdAt: string;
+  }
+
+  const { data: documents = [], isLoading } = useQuery<HRDocument[]>({
     queryKey: ['/api/hr-documents'],
     retry: false,
   });
@@ -79,55 +92,78 @@ export default function Documents() {
     },
   });
 
-  const handleGetUploadParameters = async () => {
-    try {
-      const response = await apiRequest('POST', '/api/objects/upload');
-      const data = await response.json();
-      return {
-        method: 'PUT' as const,
-        url: data.uploadURL,
-      };
-    } catch (error) {
+  const uploadDocumentMutation = useMutation({
+    mutationFn: async ({ file, category }: { file: File; category: string }) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('category', category);
+      
+      const response = await fetch('/api/hr-documents/upload', {
+        method: 'POST',
+        body: formData,
+        credentials: 'include',
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Upload failed');
+      }
+      
+      return response.json();
+    },
+    onSuccess: (data, variables) => {
       toast({
-        title: "Upload Error",
-        description: "Failed to get upload URL. Please try again.",
+        title: "Upload Complete",
+        description: `${variables.file.name} has been processed and added to the knowledge base.`,
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/hr-documents'] });
+    },
+    onError: (error: Error, variables) => {
+      toast({
+        title: "Upload Failed",
+        description: error.message,
         variant: "destructive",
       });
-      throw error;
-    }
+    },
+  });
+
+  const handleGetUploadParameters = async () => {
+    // Return dummy parameters - we'll handle upload in handleUploadComplete
+    return {
+      method: 'PUT' as const,
+      url: '#',
+    };
   };
 
   const handleUploadComplete = async (result: any) => {
     if (result.successful && result.successful.length > 0) {
-      const uploadedFile = result.successful[0];
-      
-      try {
-        // Simulate file processing progress
+      for (const uploadedFile of result.successful) {
         const fileId = uploadedFile.name;
         setUploadProgress(prev => ({ ...prev, [fileId]: 0 }));
         
-        // Increment progress every 500ms
-        const progressInterval = setInterval(() => {
-          setUploadProgress(prev => {
-            const currentProgress = prev[fileId] || 0;
-            if (currentProgress >= 100) {
-              clearInterval(progressInterval);
-              return prev;
-            }
-            return { ...prev, [fileId]: Math.min(currentProgress + 15, 100) };
-          });
-        }, 500);
+        try {
+          // Show progress
+          const progressInterval = setInterval(() => {
+            setUploadProgress(prev => {
+              const currentProgress = prev[fileId] || 0;
+              if (currentProgress >= 90) {
+                clearInterval(progressInterval);
+                return prev;
+              }
+              return { ...prev, [fileId]: Math.min(currentProgress + 10, 90) };
+            });
+          }, 200);
 
-        // Create document record
-        const formData = new FormData();
-        formData.append('file', uploadedFile.data);
-        formData.append('category', 'policy'); // Default category
-        
-        // Simulate API call completion
-        setTimeout(() => {
+          // Upload to backend - use the original File object from Uppy
+          await uploadDocumentMutation.mutateAsync({
+            file: uploadedFile.file as File,
+            category: 'policy',
+          });
+
+          clearInterval(progressInterval);
           setUploadProgress(prev => ({ ...prev, [fileId]: 100 }));
-          queryClient.invalidateQueries({ queryKey: ['/api/hr-documents'] });
           
+          // Clear progress after 2 seconds
           setTimeout(() => {
             setUploadProgress(prev => {
               const newProgress = { ...prev };
@@ -135,33 +171,28 @@ export default function Documents() {
               return newProgress;
             });
           }, 2000);
-        }, 3000);
-
-        toast({
-          title: "Upload Started",
-          description: "Your document is being processed for AI knowledge base.",
-        });
-      } catch (error) {
-        toast({
-          title: "Processing Error", 
-          description: "File uploaded but processing failed. Please try again.",
-          variant: "destructive",
-        });
+        } catch (error) {
+          setUploadProgress(prev => {
+            const newProgress = { ...prev };
+            delete newProgress[fileId];
+            return newProgress;
+          });
+        }
       }
     }
   };
 
-  const filteredDocuments = documents?.filter((doc: any) => {
+  const filteredDocuments = documents.filter((doc) => {
     const matchesSearch = doc.name.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = selectedCategory === "all" || doc.category === selectedCategory;
     return matchesSearch && matchesCategory;
-  }) || [];
+  });
 
-  const getStatusBadge = (doc: any) => {
+  const getStatusBadge = (doc: HRDocument) => {
     if (!doc.isActive) {
       return <Badge variant="secondary">Inactive</Badge>;
     }
-    if (doc.processedAt) {
+    if (doc.vectorCount > 0) {
       return <Badge className="bg-accent/10 text-accent">Active</Badge>;
     }
     return <Badge className="bg-amber-500/10 text-amber-500">Processing</Badge>;
@@ -181,8 +212,8 @@ export default function Documents() {
   };
 
   // Calculate total vectors for display
-  const totalVectors = documents?.reduce((sum: number, doc: any) => sum + (doc.vectorCount || 0), 0) || 0;
-  const totalDocuments = documents?.length || 0;
+  const totalVectors = documents.reduce((sum, doc) => sum + (doc.vectorCount || 0), 0);
+  const totalDocuments = documents.length;
 
   if (isLoading) {
     return (
@@ -314,8 +345,8 @@ export default function Documents() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredDocuments.map((doc: any) => (
-                    <TableRow key={doc.id} className="hover:bg-muted/50">
+                  {filteredDocuments.map((doc) => (
+                    <TableRow key={doc.id} className="hover:bg-muted/50" data-testid={`document-row-${doc.id}`}>
                       <TableCell>
                         <div className="flex items-center gap-3">
                           <FileText className="w-5 h-5 text-destructive" />
