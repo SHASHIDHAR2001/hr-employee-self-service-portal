@@ -1,11 +1,14 @@
 import os
+import subprocess
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
-from fastapi.responses import RedirectResponse, JSONResponse
+from fastapi.responses import RedirectResponse, JSONResponse, FileResponse, Response
+from fastapi.staticfiles import StaticFiles
 from authlib.integrations.starlette_client import OAuth
 import uvicorn
 from datetime import datetime
+import httpx
 
 from routes import router
 from database import init_db
@@ -77,6 +80,39 @@ async def logout(request: Request):
     return RedirectResponse(url="/")
 
 app.include_router(router)
+
+# Proxy to Vite dev server for frontend
+@app.middleware("http")
+async def proxy_to_vite(request: Request, call_next):
+    # Skip websocket requests (for Vite HMR)
+    if request.scope.get("type") == "websocket":
+        return await call_next(request)
+    
+    # Only proxy non-API HTTP requests
+    if not request.url.path.startswith("/api") and not request.url.path.startswith("/docs") and not request.url.path.startswith("/openapi.json"):
+        try:
+            async with httpx.AsyncClient() as client:
+                vite_url = f"http://localhost:5173{request.url.path}"
+                if request.url.query:
+                    vite_url += f"?{request.url.query}"
+                
+                response = await client.get(
+                    vite_url,
+                    headers=dict(request.headers),
+                    follow_redirects=True,
+                    timeout=30.0
+                )
+                
+                return Response(
+                    content=response.content,
+                    status_code=response.status_code,
+                    headers=dict(response.headers),
+                    media_type=response.headers.get("content-type")
+                )
+        except:
+            pass
+    
+    return await call_next(request)
 
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
