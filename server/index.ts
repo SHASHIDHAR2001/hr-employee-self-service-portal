@@ -1,81 +1,70 @@
-import express, { type Request, Response, NextFunction } from "express";
-import { registerRoutes } from "./routes";
-import { setupVite, serveStatic, log } from "./vite";
+import { spawn } from "child_process";
+import path from "path";
+import { fileURLToPath } from 'url';
+import express from "express";
+import { createProxyMiddleware } from "http-proxy-middleware";
+import { setupVite } from "./vite";
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+console.log("=" .repeat(60));
+console.log("Starting HR Portal: Python Backend + Vite Frontend");
+console.log("=" .repeat(60));
+console.log("");
+
+// Create Express app
 const app = express();
 
-declare module 'http' {
-  interface IncomingMessage {
-    rawBody: unknown
-  }
-}
-app.use(express.json({
-  verify: (req, _res, buf) => {
-    req.rawBody = buf;
-  }
+// Proxy API requests to Python backend (preserve /api prefix)
+app.use(createProxyMiddleware({
+  target: 'http://localhost:8000',
+  changeOrigin: true,
+  logLevel: 'silent',
+  filter: (pathname) => pathname.startsWith('/api')
 }));
-app.use(express.urlencoded({ extended: false }));
 
-app.use((req, res, next) => {
-  const start = Date.now();
-  const path = req.path;
-  let capturedJsonResponse: Record<string, any> | undefined = undefined;
+// Setup Vite for development
+const server = (await import('http')).createServer(app);
+await setupVite(app, server);
 
-  const originalResJson = res.json;
-  res.json = function (bodyJson, ...args) {
-    capturedJsonResponse = bodyJson;
-    return originalResJson.apply(res, [bodyJson, ...args]);
-  };
-
-  res.on("finish", () => {
-    const duration = Date.now() - start;
-    if (path.startsWith("/api")) {
-      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
-      }
-
-      if (logLine.length > 80) {
-        logLine = logLine.slice(0, 79) + "…";
-      }
-
-      log(logLine);
-    }
-  });
-
-  next();
+// Start Express+Vite server on port 5000
+const port = 5000;
+server.listen(port, "0.0.0.0", () => {
+  console.log(`✓ Vite dev server on http://localhost:${port}`);
+  console.log(`✓ API proxied to Python backend on http://localhost:8000`);
+  console.log("");
 });
 
-(async () => {
-  const server = await registerRoutes(app);
+// Start Python server on port 8000
+console.log("Starting Python backend on port 8000...");
+const pythonServerPath = path.join(__dirname, "..", "python_server");
 
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
+const pythonServer = spawn("python3", ["main.py"], {
+  cwd: pythonServerPath,
+  stdio: "inherit",
+  env: { ...process.env, PORT: "8000" }
+});
 
-    res.status(status).json({ message });
-    throw err;
-  });
+pythonServer.on("error", (error) => {
+  console.error("Failed to start Python server:", error);
+  process.exit(1);
+});
 
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
-  if (app.get("env") === "development") {
-    await setupVite(app, server);
-  } else {
-    serveStatic(app);
-  }
+pythonServer.on("close", (code) => {
+  console.log(`Python server exited with code ${code}`);
+  process.exit(code || 0);
+});
 
-  // ALWAYS serve the app on the port specified in the environment variable PORT
-  // Other ports are firewalled. Default to 5000 if not specified.
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
-  const port = parseInt(process.env.PORT || '5000', 10);
-  server.listen({
-    port,
-    host: "0.0.0.0",
-    reusePort: true,
-  }, () => {
-    log(`serving on port ${port}`);
-  });
-})();
+// Handle process termination
+process.on("SIGINT", () => {
+  console.log("\nShutting down servers...");
+  pythonServer.kill("SIGINT");
+  process.exit(0);
+});
+
+process.on("SIGTERM", () => {
+  console.log("\nShutting down servers...");
+  pythonServer.kill("SIGTERM");
+  process.exit(0);
+});
