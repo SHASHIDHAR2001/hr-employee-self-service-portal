@@ -326,7 +326,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ answer, documentsUsed });
     } catch (error) {
       console.error("Error processing AI question:", error);
-      res.status(500).json({ message: "Failed to process your question. Please try again." });
+      const errorMessage = error instanceof Error ? error.message : "Failed to process your question. Please try again.";
+      res.status(500).json({ message: errorMessage });
     }
   });
 

@@ -1,8 +1,7 @@
 import OpenAI from "openai";
 
-// the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
 const openai = new OpenAI({ 
-  apiKey: process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY_ENV_VAR || "default_key" 
+  apiKey: process.env.OPENAI_API_KEY || "" 
 });
 
 interface DocumentContext {
@@ -16,6 +15,10 @@ export async function askHRAssistant(
   documents: DocumentContext[]
 ): Promise<{ answer: string; documentsUsed: string[] }> {
   try {
+    if (!process.env.OPENAI_API_KEY) {
+      throw new Error("OpenAI API key is not configured. Please add your OPENAI_API_KEY to use the AI Assistant.");
+    }
+
     const context = documents
       .map(doc => `Document: ${doc.name} (${doc.category})\nContent: ${doc.content}`)
       .join('\n\n---\n\n');
@@ -34,12 +37,12 @@ Available Documents:
 ${context}`;
 
     const response = await openai.chat.completions.create({
-      model: "gpt-5",
+      model: "gpt-4o",
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: question }
       ],
-      max_completion_tokens: 8192,
+      max_tokens: 1000,
     });
 
     const answer = response.choices[0].message.content || "I apologize, but I couldn't generate a response to your question.";
@@ -57,6 +60,9 @@ ${context}`;
 
   } catch (error) {
     console.error("Error calling OpenAI API:", error);
+    if (error instanceof Error && error.message.includes("OpenAI API key is not configured")) {
+      throw error;
+    }
     throw new Error("Failed to get AI response. Please try again later.");
   }
 }
@@ -66,8 +72,14 @@ export async function processDocumentForVectorization(
   documentName: string
 ): Promise<string[]> {
   try {
+    if (!process.env.OPENAI_API_KEY) {
+      // Fallback: simple text splitting when API key is not available
+      const chunks = documentContent.split('\n\n').filter(chunk => chunk.trim().length > 50);
+      return chunks.slice(0, 50);
+    }
+
     const response = await openai.chat.completions.create({
-      model: "gpt-5",
+      model: "gpt-4o",
       messages: [
         {
           role: "system",
@@ -79,7 +91,7 @@ export async function processDocumentForVectorization(
         }
       ],
       response_format: { type: "json_object" },
-      max_completion_tokens: 8192,
+      max_tokens: 2000,
     });
 
     const result = JSON.parse(response.choices[0].message.content || '{"chunks": []}');
