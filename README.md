@@ -4,6 +4,19 @@ A comprehensive HR Employee Self-Service Portal with a **Python FastAPI backend*
 
 ## 🏗️ Architecture
 
+<img width="1918" height="941" alt="image" src="https://github.com/user-attachments/assets/b7a0c548-2554-4cb2-95f5-e2162c09c172" />
+<img width="1919" height="996" alt="image" src="https://github.com/user-attachments/assets/1386e30a-cdec-4836-a07d-ee666c7c4b44" />
+<img width="1919" height="947" alt="image" src="https://github.com/user-attachments/assets/7dab9157-4434-49c8-9ba7-67ffda265805" />
+<img width="1917" height="945" alt="image" src="https://github.com/user-attachments/assets/05e43e76-e735-4ab1-bfff-272fe226bc1a" />
+<img width="1919" height="948" alt="image" src="https://github.com/user-attachments/assets/f5937532-d3cb-429d-892b-40828b096225" />
+<img width="1917" height="956" alt="image" src="https://github.com/user-attachments/assets/cbc95e58-43e8-44ee-a98b-7a67f71c3621" />
+<img width="1919" height="949" alt="image" src="https://github.com/user-attachments/assets/cb070965-92f3-4d1f-8750-fe059c5adeca" />
+<img width="1919" height="944" alt="image" src="https://github.com/user-attachments/assets/00693325-b916-462b-bf91-f336339fb10c" />
+<img width="1916" height="946" alt="image" src="https://github.com/user-attachments/assets/6c5ff2ff-b60b-4c26-8e63-b23386034127" />
+<img width="1918" height="941" alt="image" src="https://github.com/user-attachments/assets/5067a8a5-fdbb-44ae-a4da-4f81395c852e" />
+<img width="1919" height="947" alt="image" src="https://github.com/user-attachments/assets/9a344684-8e77-42cf-9abd-e560c2b96101" />
+
+
 ### Backend (Python)
 - **Framework**: FastAPI
 - **ORM**: SQLAlchemy
