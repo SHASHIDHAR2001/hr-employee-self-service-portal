@@ -15,7 +15,7 @@ def init_database():
     """Initialize database with sample data"""
     
     # Create database engine
-    engine = create_engine(settings.DATABASE_URL, echo=True)
+    engine = create_engine(settings.database_url, echo=True)
     
     # Create all tables
     print("Creating database tables...")
