@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, R
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import datetime, date
+from pydantic import BaseModel
 import os
 
 from database import get_db
@@ -312,12 +313,11 @@ async def upload_hr_document(
 ):
     storage = DatabaseStorage(db)
     
-    import aiofiles
     import tempfile
     
-    with tempfile.NamedTemporaryFile(delete=False, suffix=f"_{file.filename}") as temp_file:
+    content = await file.read()
+    with tempfile.NamedTemporaryFile(delete=False, suffix=f"_{file.filename}", mode='wb') as temp_file:
         temp_path = temp_file.name
-        content = await file.read()
         temp_file.write(content)
     
     try:
@@ -355,14 +355,18 @@ async def delete_hr_document(document_id: str, user_id: str = Depends(get_user_i
     storage.delete_hr_document(document_id)
     return {"message": "Document deleted successfully"}
 
+class AskQuestionSchema(BaseModel):
+    question: str
+
 @router.post("/ai/ask")
 async def ask_ai_assistant(
-    question: str = Form(...),
+    data: AskQuestionSchema,
     user_id: str = Depends(get_user_id),
     db: Session = Depends(get_db)
 ):
     storage = DatabaseStorage(db)
     
+    question = data.question
     if not question or not question.strip():
         raise HTTPException(status_code=400, detail="Question is required")
     

@@ -40,6 +40,10 @@ export default function AIAssistant() {
   const askAIMutation = useMutation({
     mutationFn: async (question: string) => {
       const response = await apiRequest('POST', '/api/ai/ask', { question });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to get AI response');
+      }
       return response.json();
     },
     onSuccess: (data) => {

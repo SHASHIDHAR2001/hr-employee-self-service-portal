@@ -16,9 +16,12 @@ import { insertLeaveSchema } from "@shared/schema";
 import { z } from "zod";
 import { Send, Upload } from "lucide-react";
 
-const applyLeaveSchema = insertLeaveSchema.extend({
+const applyLeaveSchema = insertLeaveSchema.omit({
+  userId: true,
+}).extend({
   contactNumber: z.string().optional(),
   isHalfDay: z.boolean().optional(),
+  reason: z.string().min(10, "Reason must be at least 10 characters"),
 });
 
 type ApplyLeaveForm = z.infer<typeof applyLeaveSchema>;
@@ -50,7 +53,12 @@ export default function ApplyLeave() {
 
   const applyLeaveMutation = useMutation({
     mutationFn: async (data: ApplyLeaveForm) => {
-      return await apiRequest('POST', '/api/leaves', data);
+      const response = await apiRequest('POST', '/api/leaves', data);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to submit leave request');
+      }
+      return response.json();
     },
     onSuccess: () => {
       toast({
