@@ -18,6 +18,12 @@ import { Send, Upload } from "lucide-react";
 
 const applyLeaveSchema = insertLeaveSchema.omit({
   userId: true,
+  days: true,
+  reviewedAt: true,
+  reviewedBy: true,
+  reviewComments: true,
+  status: true,
+  attachmentPath: true,
 }).extend({
   contactNumber: z.string().optional(),
   isHalfDay: z.boolean().optional(),
