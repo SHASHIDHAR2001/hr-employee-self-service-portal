@@ -18,13 +18,15 @@ oauth = OAuth()
 def configure_oauth():
     for domain in REPLIT_DOMAINS:
         if domain:
+            # Register with PKCE support (required by Replit OIDC)
             redirect_uri = f"https://{domain}/api/auth/callback"
             oauth.register(
                 name='replit',
                 client_id=REPL_ID,
                 server_metadata_url=f"{ISSUER_URL}/.well-known/openid-configuration",
                 client_kwargs={
-                    'scope': 'openid profile email'
+                    'scope': 'openid profile email',
+                    'code_challenge_method': 'S256'  # Enable PKCE with SHA-256
                 }
             )
             break

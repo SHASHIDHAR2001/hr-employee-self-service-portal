@@ -38,7 +38,9 @@ async def startup_event():
 
 @app.get("/api/auth/login")
 async def login(request: Request):
-    redirect_uri = request.url_for('auth_callback')
+    # Use the configured domain to build the correct redirect URI
+    domain = os.getenv("REPLIT_DOMAINS", "").split(",")[0]
+    redirect_uri = f"https://{domain}/api/auth/callback"
     return await oauth.replit.authorize_redirect(request, redirect_uri)
 
 @app.get("/api/auth/callback")
