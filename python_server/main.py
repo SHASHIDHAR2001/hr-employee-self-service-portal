@@ -1,5 +1,6 @@
 import os
 import subprocess
+from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
@@ -32,9 +33,15 @@ app.add_middleware(
 
 configure_oauth()
 
+# Check if we're in production mode (based on NODE_ENV only)
+DIST_DIR = Path(__file__).parent.parent / "dist" / "public"
+IS_PRODUCTION = os.getenv("NODE_ENV") == "production"
+
 @app.on_event("startup")
 async def startup_event():
     init_db()
+    if IS_PRODUCTION:
+        print(f"✓ Running in PRODUCTION mode, serving static files from {DIST_DIR}")
 
 @app.get("/api/auth/login")
 async def login(request: Request):
@@ -83,38 +90,57 @@ async def logout(request: Request):
 
 app.include_router(router)
 
-# Proxy to Vite dev server for frontend
-@app.middleware("http")
-async def proxy_to_vite(request: Request, call_next):
-    # Skip websocket requests (for Vite HMR)
-    if request.scope.get("type") == "websocket":
+# Serve static files in production, proxy to Vite in development
+if IS_PRODUCTION:
+    # Mount static files
+    app.mount("/assets", StaticFiles(directory=str(DIST_DIR / "assets")), name="static")
+    
+    @app.get("/{full_path:path}")
+    async def serve_spa(full_path: str):
+        # Skip API routes
+        if full_path.startswith("api/") or full_path.startswith("docs") or full_path.startswith("openapi.json"):
+            return JSONResponse({"detail": "Not Found"}, status_code=404)
+        
+        # Try to serve the requested file
+        file_path = DIST_DIR / full_path
+        if file_path.is_file():
+            return FileResponse(file_path)
+        
+        # For all other routes, serve index.html (SPA routing)
+        return FileResponse(DIST_DIR / "index.html")
+else:
+    # Development: Proxy to Vite dev server for frontend
+    @app.middleware("http")
+    async def proxy_to_vite(request: Request, call_next):
+        # Skip websocket requests (for Vite HMR)
+        if request.scope.get("type") == "websocket":
+            return await call_next(request)
+        
+        # Only proxy non-API HTTP requests
+        if not request.url.path.startswith("/api") and not request.url.path.startswith("/docs") and not request.url.path.startswith("/openapi.json"):
+            try:
+                async with httpx.AsyncClient() as client:
+                    vite_url = f"http://localhost:5173{request.url.path}"
+                    if request.url.query:
+                        vite_url += f"?{request.url.query}"
+                    
+                    response = await client.get(
+                        vite_url,
+                        headers=dict(request.headers),
+                        follow_redirects=True,
+                        timeout=30.0
+                    )
+                    
+                    return Response(
+                        content=response.content,
+                        status_code=response.status_code,
+                        headers=dict(response.headers),
+                        media_type=response.headers.get("content-type")
+                    )
+            except:
+                pass
+        
         return await call_next(request)
-    
-    # Only proxy non-API HTTP requests
-    if not request.url.path.startswith("/api") and not request.url.path.startswith("/docs") and not request.url.path.startswith("/openapi.json"):
-        try:
-            async with httpx.AsyncClient() as client:
-                vite_url = f"http://localhost:5173{request.url.path}"
-                if request.url.query:
-                    vite_url += f"?{request.url.query}"
-                
-                response = await client.get(
-                    vite_url,
-                    headers=dict(request.headers),
-                    follow_redirects=True,
-                    timeout=30.0
-                )
-                
-                return Response(
-                    content=response.content,
-                    status_code=response.status_code,
-                    headers=dict(response.headers),
-                    media_type=response.headers.get("content-type")
-                )
-        except:
-            pass
-    
-    return await call_next(request)
 
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
