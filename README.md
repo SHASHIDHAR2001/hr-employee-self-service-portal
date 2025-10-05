@@ -369,8 +369,6 @@ pip install -r requirements.txt
 
 ## 📄 License
 
-[Your License Here]
-
 ## 👥 Contributing
 
 1. Fork the repository
