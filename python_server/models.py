@@ -147,7 +147,7 @@ class UpsertUserSchema(BaseModel):
         populate_by_name = True
 
 class InsertLeaveSchema(BaseModel):
-    user_id: str = Field(..., alias="userId")
+    user_id: Optional[str] = Field(None, alias="userId")
     leave_type_id: str = Field(..., alias="leaveTypeId")
     from_date: str = Field(..., alias="fromDate")
     to_date: str = Field(..., alias="toDate")
