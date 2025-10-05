@@ -1,4 +1,5 @@
 import os
+import time
 from authlib.integrations.starlette_client import OAuth
 from authlib.oidc.core import CodeIDToken
 from starlette.middleware.sessions import SessionMiddleware
@@ -36,7 +37,7 @@ async def get_current_user(request: Request) -> dict:
             detail="Not authenticated"
         )
     
-    if user.get("expires_at") and user["expires_at"] < httpx.get("time"):
+    if user.get("expires_at") and user["expires_at"] < time.time():
         refresh_token = user.get("refresh_token")
         if refresh_token:
             try:
@@ -54,7 +55,7 @@ async def get_current_user(request: Request) -> dict:
                         token_data = response.json()
                         user["access_token"] = token_data.get("access_token")
                         user["refresh_token"] = token_data.get("refresh_token")
-                        user["expires_at"] = token_data.get("expires_in", 0) + httpx.get("time")
+                        user["expires_at"] = time.time() + token_data.get("expires_in", 0)
                         request.session["user"] = user
                     else:
                         raise HTTPException(

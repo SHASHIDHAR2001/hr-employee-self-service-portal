@@ -1,32 +1,55 @@
 import os
+import json
+import tempfile
 from google.cloud import storage
-from google.oauth2 import service_account
+from google.auth import external_account
 from typing import Optional, List
 import httpx
 
 REPLIT_SIDECAR_ENDPOINT = "http://127.0.0.1:1106"
 
 class ObjectStorageService:
+    _client = None
+    
     def __init__(self):
-        credentials_config = {
-            "type": "external_account",
-            "audience": "replit",
-            "subject_token_type": "access_token",
-            "token_url": f"{REPLIT_SIDECAR_ENDPOINT}/token",
-            "credential_source": {
-                "url": f"{REPLIT_SIDECAR_ENDPOINT}/credential",
-                "format": {
-                    "type": "json",
-                    "subject_token_field_name": "access_token"
-                }
-            },
-            "universe_domain": "googleapis.com"
-        }
+        pass
+    
+    def _get_client(self):
+        if self._client is None:
+            credentials_config = {
+                "type": "external_account",
+                "audience": "replit",
+                "subject_token_type": "access_token",
+                "token_url": f"{REPLIT_SIDECAR_ENDPOINT}/token",
+                "credential_source": {
+                    "url": f"{REPLIT_SIDECAR_ENDPOINT}/credential",
+                    "format": {
+                        "type": "json",
+                        "subject_token_field_name": "access_token"
+                    }
+                },
+                "universe_domain": "googleapis.com"
+            }
+            
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+                json.dump(credentials_config, f)
+                config_file = f.name
+            
+            try:
+                credentials = external_account.Credentials.from_file(config_file)
+                self._client = storage.Client(
+                    project="",
+                    credentials=credentials
+                )
+            finally:
+                if os.path.exists(config_file):
+                    os.unlink(config_file)
         
-        self.client = storage.Client(
-            project="",
-            credentials=credentials_config
-        )
+        return self._client
+    
+    @property
+    def client(self):
+        return self._get_client()
     
     def get_public_object_search_paths(self) -> List[str]:
         paths_str = os.getenv("PUBLIC_OBJECT_SEARCH_PATHS", "")

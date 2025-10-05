@@ -36,27 +36,29 @@ Preferred communication style: Simple, everyday language.
 
 ### Backend Architecture
 
-**Framework**: Express.js running on Node.js with TypeScript.
+**Framework**: FastAPI running on Python 3.11 with SQLAlchemy ORM.
 
 **API Design**: RESTful API architecture with routes organized by feature domain (leaves, attendance, salary, documents, AI assistant).
 
-**Authentication**: Replit Auth using OpenID Connect (OIDC) with Passport.js strategy for session-based authentication.
+**Authentication**: Replit Auth using OpenID Connect (OIDC) with Authlib for session-based authentication.
 
-**Session Management**: express-session with PostgreSQL session store (connect-pg-simple) for persistent sessions across server restarts.
+**Session Management**: Starlette SessionMiddleware with PostgreSQL session store for persistent sessions across server restarts.
 
 **Request/Response Flow**:
-- JSON request/response bodies
+- JSON request/response bodies using Pydantic models
 - Request logging middleware for API routes
-- Error handling with appropriate HTTP status codes
+- Automatic error handling with appropriate HTTP status codes
 - CORS and security headers handled by middleware
 
-**Storage Layer**: Abstracted through an IStorage interface in `server/storage.ts`, providing clean separation between business logic and data access.
+**Storage Layer**: Abstracted through DatabaseStorage class in `python_server/storage.py`, providing clean separation between business logic and data access.
+
+**Auto-Generated Documentation**: FastAPI provides interactive API documentation at `/docs` (Swagger UI) and `/redoc` (ReDoc).
 
 ### Database Architecture
 
-**ORM**: Drizzle ORM with PostgreSQL dialect for type-safe database operations.
+**ORM**: SQLAlchemy with PostgreSQL dialect for type-safe database operations.
 
-**Database Provider**: Neon Serverless PostgreSQL via @neondatabase/serverless with WebSocket support.
+**Database Provider**: PostgreSQL via psycopg2-binary driver.
 
 **Schema Design**:
 - `users`: Employee profiles with Replit Auth integration (mandatory table)
@@ -69,17 +71,17 @@ Preferred communication style: Simple, everyday language.
 - `hrDocuments`: Document metadata and storage references
 - `aiConversations`: Chat history with AI assistant
 
-**Migration Strategy**: Drizzle Kit for schema migrations with migrations stored in `/migrations` directory.
+**Migration Strategy**: Alembic for schema migrations (optional), or automatic table creation via SQLAlchemy on startup.
 
 ### External Service Integrations
 
 **Authentication Service**: Replit Auth (OIDC provider)
-- Integration through openid-client library
+- Integration through Authlib library
 - Session-based authentication with secure cookies
 - User profile synchronization with local database
 
 **AI Service**: OpenAI GPT-4o
-- Integration in `server/openai.ts`
+- Integration in `python_server/openai_service.py`
 - Document-based context retrieval for HR assistant
 - Conversation history tracking for improved responses
 
@@ -99,28 +101,28 @@ Preferred communication style: Simple, everyday language.
 ### Development and Build Process
 
 **Development Mode**: 
-- Vite dev server with HMR (Hot Module Replacement)
-- Express server runs backend API
+- Vite dev server with HMR (Hot Module Replacement) for frontend
+- Python FastAPI server with auto-reload using Uvicorn
 - Concurrent frontend and backend development
 - Replit-specific plugins for enhanced development experience
 
 **Production Build**:
 - Frontend: Vite builds optimized React bundle to `dist/public`
-- Backend: esbuild bundles server code to `dist/index.js`
+- Backend: Python FastAPI server runs with Uvicorn in production mode
 - Static file serving from built frontend assets
 
-**Type Safety**: Shared TypeScript types between frontend and backend via `shared/schema.ts` using Drizzle Zod schemas.
+**Type Safety**: Pydantic models provide runtime validation and automatic API documentation in Python backend. Frontend uses TypeScript for compile-time type safety.
 
 ## External Dependencies
 
 ### Core Infrastructure
-- **Database**: PostgreSQL via Neon Serverless (@neondatabase/serverless)
-- **Authentication**: Replit Auth (OIDC provider accessed via openid-client)
-- **Session Store**: PostgreSQL (connect-pg-simple)
+- **Database**: PostgreSQL via psycopg2-binary
+- **Authentication**: Replit Auth (OIDC provider accessed via Authlib)
+- **Session Store**: Starlette SessionMiddleware
 
 ### Cloud Services
-- **Object Storage**: Google Cloud Storage (@google-cloud/storage) with Replit Object Storage sidecar
-- **AI/ML**: OpenAI API (GPT-4o model)
+- **Object Storage**: Google Cloud Storage (google-cloud-storage) with Replit Object Storage sidecar
+- **AI/ML**: OpenAI API (GPT-4o model via openai Python library)
 
 ### Frontend Libraries
 - **UI Framework**: React 18+ with TypeScript
@@ -131,18 +133,24 @@ Preferred communication style: Simple, everyday language.
 - **File Upload**: Uppy (@uppy/core, @uppy/dashboard, @uppy/aws-s3, @uppy/react)
 - **Routing**: wouter
 
-### Backend Libraries
-- **Web Framework**: Express.js
-- **ORM**: Drizzle ORM with drizzle-zod for schema validation
-- **Authentication**: Passport.js with openid-client
-- **File Upload**: multer (for temporary file handling)
-- **Utilities**: memoizee (for caching OIDC configuration)
+### Backend Libraries (Python)
+- **Web Framework**: FastAPI 0.118.0
+- **ORM**: SQLAlchemy 2.0.43
+- **Database Driver**: psycopg2-binary 2.9.10
+- **Validation**: Pydantic 2.11.10
+- **Authentication**: Authlib 1.6.5
+- **HTTP Client**: httpx 0.28.1
+- **File Upload**: python-multipart (for multipart form data)
+- **AI Integration**: openai 2.1.0
+- **Object Storage**: google-cloud-storage 3.4.0
+- **Configuration**: pydantic-settings 2.11.0
+- **Server**: Uvicorn 0.37.0
 
 ### Build Tools
 - **Frontend Build**: Vite with React plugin
-- **Backend Build**: esbuild
-- **TypeScript**: tsc for type checking
-- **Database Migrations**: Drizzle Kit
+- **Backend Server**: Uvicorn ASGI server
+- **TypeScript**: tsc for type checking (frontend only)
+- **Database Migrations**: Alembic (optional), or automatic via SQLAlchemy
 
 ### Development Tools (Replit-specific)
 - @replit/vite-plugin-runtime-error-modal
